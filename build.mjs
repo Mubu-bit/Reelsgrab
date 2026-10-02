@@ -1,10 +1,31 @@
 // Static build: src/pages/*.html + layout -> dist/. Run by Vercel via `npm run build`.
-// Env: SITE_URL (final domain, e.g. https://reelgrab.com), CONTACT_EMAIL (shown on /contact and /privacy).
-import { readFileSync, writeFileSync, mkdirSync, rmSync, cpSync, existsSync } from "node:fs";
+// Env: SITE_URL (final domain), CONTACT_EMAIL (shown on /contact and /privacy; REQUIRED for production builds).
+import { readFileSync, writeFileSync, mkdirSync, rmSync, cpSync } from "node:fs";
 
-const raw = process.env.SITE_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL && "https://" + process.env.VERCEL_PROJECT_PRODUCTION_URL) || "https://reelgrab-orpin.vercel.app";
-const SITE = raw.replace(/\/+$/, "").replace(/^http:/, "https:");
+const IS_PROD = process.env.VERCEL_ENV === "production";
+const fromEnv = (process.env.SITE_URL || "").trim() ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? "https://" + process.env.VERCEL_PROJECT_PRODUCTION_URL : "");
+const raw = fromEnv || (IS_PROD ? "" : "http://localhost:3000"); // local/dev preview only; never used in production
+let SITE;
+try {
+  const u = new URL(raw);
+  if (u.pathname !== "/" || u.search || u.hash) throw new Error("must be an origin only, with no path");
+  const local = ["localhost", "127.0.0.1"].includes(u.hostname);
+  if (u.protocol !== "https:" && !local) throw new Error("must start with https://");
+  SITE = u.origin;
+} catch (err) {
+  console.error(`\nBUILD ERROR: SITE_URL is missing or invalid (${err.message}). Set SITE_URL=https://yourdomain.com in Vercel.\n`);
+  process.exit(1);
+}
 const EMAIL = (process.env.CONTACT_EMAIL || "").trim();
+if (EMAIL && !/^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(EMAIL)) {
+  console.error("\nBUILD ERROR: CONTACT_EMAIL is not a valid email address.\n");
+  process.exit(1);
+}
+if (IS_PROD && !EMAIL) {
+  console.error("\nBUILD ERROR: CONTACT_EMAIL is not set. Add CONTACT_EMAIL=your real email in Vercel > Settings > Environment Variables (Production), then redeploy.\nThe production build is stopped so that no placeholder is ever published.\n");
+  process.exit(1);
+}
 const NAME = "ReelGrab";
 const UPDATED = "October 1, 2026";
 
@@ -26,7 +47,7 @@ const pages = [
 const e = s => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 const contactHtml = EMAIL
   ? `<a href="mailto:${e(EMAIL)}">${e(EMAIL)}</a>`
-  : `<strong>[Contact email not configured yet — the site owner must set CONTACT_EMAIL before launch]</strong>`;
+  : `<strong>[Contact email not configured yet — set CONTACT_EMAIL in Vercel]</strong>`;
 
 const header = `<a class="skip" href="#main">Skip to content</a><header><a class="brand" href="/">Reel<span>Grab</span></a><nav aria-label="Main"><a href="/#how">How it works</a><a href="/#guides">Guides</a><a href="/#faq">FAQ</a><a href="/about">About</a></nav></header>`;
 const footer = `<footer><nav aria-label="Footer"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/download-instagram-reels-on-iphone">iPhone guide</a><a href="/download-instagram-reels-on-android">Android guide</a><a href="/instagram-reel-not-downloading">Troubleshooting</a></nav><small>© 2026 ReelGrab. An independent tool, not affiliated with, endorsed by, or sponsored by Instagram or Meta.</small></footer>`;
@@ -68,4 +89,4 @@ for (const f of ["app.js", "style.css", "favicon.svg", "favicon.ico", "apple-tou
 const indexable = pages.filter(p => !p.noindex);
 writeFileSync("dist/sitemap.xml", `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${indexable.map(p => `<url><loc>${SITE}${p.path === "/" ? "/" : p.path}</loc></url>`).join("\n")}\n</urlset>\n`);
 writeFileSync("dist/robots.txt", `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${SITE}/sitemap.xml\n`);
-console.log(`Built ${pages.length} pages for ${SITE}` + (EMAIL ? "" : "  (WARNING: CONTACT_EMAIL not set)"));
+console.log(`Built ${pages.length} pages for ${SITE}` + (EMAIL ? "" : "  (preview/dev build: CONTACT_EMAIL not set, placeholder shown)"));

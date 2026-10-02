@@ -38,10 +38,10 @@
     if (problem) { input.setAttribute("aria-invalid", "true"); say(problem, "err"); input.focus(); return; }
 
     busy = true; btn.disabled = true; btn.textContent = "Working…"; input.setAttribute("aria-busy", "true");
-    say("Fetching the Reel. This can take up to 30 seconds…", "load");
+    say("Fetching the Reel. Usually a few seconds, sometimes up to 40…", "load");
     const slow = setTimeout(() => say("Still working. The media service can be slow, so please keep this page open…", "load"), 12000);
     const ctrl = new AbortController();
-    const abort = setTimeout(() => ctrl.abort(), 60000);
+    const abort = setTimeout(() => ctrl.abort(), 45000);
 
     try {
       const r = await fetch("/api/download", {
