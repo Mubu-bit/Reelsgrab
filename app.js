@@ -67,7 +67,7 @@
         result.append(img);
       }
       const a = document.createElement("a");
-      a.href = d.videoUrl; a.target = "_blank"; a.rel = "noopener noreferrer"; a.textContent = "Open video to save it";
+      a.href = d.downloadUrl || d.videoUrl; a.download = "reelgrab-video.mp4"; a.textContent = "Download video";
       result.append(a);
     } catch (e) {
       say(e && e.name === "AbortError"
