@@ -39,6 +39,16 @@ function normalize(input) {
 
 const httpsUrl = v => (typeof v === "string" && /^https:\/\/[^\s]+$/.test(v) ? v : null);
 
+async function signedFileUrl(videoUrl, secret) {
+  const e = String(Date.now() + 15 * 60_000);
+  const u = btoa(videoUrl).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const k = await crypto.subtle.importKey("raw", new TextEncoder().encode("reelgrab-file:" + secret),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = [...new Uint8Array(await crypto.subtle.sign("HMAC", k, new TextEncoder().encode(`${e}.${u}`)))]
+    .map(b => b.toString(16).padStart(2, "0")).join("");
+  return `/api/file?e=${e}&u=${u}&s=${sig}`;
+}
+
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") { res.setHeader("Allow", "POST"); return fail(res, 405, "method", "Method not allowed."); }
@@ -100,7 +110,8 @@ export default async function handler(req, res) {
       return fail(res, 404, "no_video", "No downloadable video was returned. The Reel may be private, deleted, restricted, or not a video.");
     }
     const thumbnail = httpsUrl(item.thumbnail || item.thumbnailUrl || item.media?.imageUrl || item.imageUrl);
-    return res.status(200).json({ ok: true, videoUrl, thumbnail });
+    const downloadUrl = await signedFileUrl(videoUrl, process.env.APIFY_TOKEN);
+    return res.status(200).json({ ok: true, videoUrl, downloadUrl, thumbnail });
   } catch (e) {
     if (e && e.name === "AbortError") return fail(res, 504, "timeout", "The media service took too long to respond. Please try again.");
     console.error("handler_error", e && e.name);
