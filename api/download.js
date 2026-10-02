@@ -3,16 +3,21 @@
 
 const REEL_PATH = /^\/(?:[A-Za-z0-9._]+\/)?(?:reel|reels)\/[A-Za-z0-9_-]{5,40}\/?$/;
 const ACTOR = "lance_api~instagram-reels-downloader-api";
-const PROVIDER_TIMEOUT_S = 40;
+const PROVIDER_TIMEOUT_S = 35;   // asked of Apify
+const BACKEND_ABORT_MS = 38_000; // our own hard stop (frontend waits 45s so it receives our JSON error)
 
 // Best-effort, per-instance rate limit. Real protection = Vercel Firewall rate limit + Apify spending cap (see README).
 const hits = new Map();
 const LIMITS = [[60_000, 5], [3_600_000, 30]];
+const GLOBAL_CAP = [600_000, 120]; // per instance, all clients: max lookups per 10 min (limits spend if many IPs are used)
+let globalHits = [];
 function limited(ip) {
   const now = Date.now();
+  globalHits = globalHits.filter(t => now - t < GLOBAL_CAP[0]);
+  if (globalHits.length >= GLOBAL_CAP[1]) return true;
   const list = (hits.get(ip) || []).filter(t => now - t < 3_600_000);
   const over = LIMITS.some(([win, max]) => list.filter(t => now - t < win).length >= max);
-  if (!over) list.push(now);
+  if (!over) { list.push(now); globalHits.push(now); }
   hits.set(ip, list);
   if (hits.size > 5000) for (const k of hits.keys()) { hits.delete(k); if (hits.size < 2500) break; }
   return over;
@@ -45,7 +50,8 @@ export default async function handler(req, res) {
     if (!ok) return fail(res, 403, "forbidden", "Request not allowed.");
   }
 
-  const ip = String(req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "unknown").split(",")[0].trim();
+  // On Vercel these headers are set by the platform. x-forwarded-for is the fallback for local testing.
+  const ip = String(req.headers["x-vercel-forwarded-for"] || req.headers["x-real-ip"] || req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "unknown").split(",")[0].trim();
   if (limited(ip)) {
     res.setHeader("Retry-After", "60");
     return fail(res, 429, "rate_limited", "Too many requests. Please wait a minute and try again.");
@@ -64,7 +70,7 @@ export default async function handler(req, res) {
   }
 
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), (PROVIDER_TIMEOUT_S + 5) * 1000);
+  const timer = setTimeout(() => ctrl.abort(), BACKEND_ABORT_MS);
   try {
     const r = await fetch(
       `https://api.apify.com/v2/acts/${ACTOR}/run-sync-get-dataset-items?timeout=${PROVIDER_TIMEOUT_S}`,
@@ -78,6 +84,10 @@ export default async function handler(req, res) {
     if (!r.ok) {
       console.error("provider_status", r.status);
       if (r.status === 408) return fail(res, 504, "timeout", "The media service took too long to respond. Please try again.");
+      if ([401, 402, 403].includes(r.status)) {
+        console.error("provider_config_problem", r.status); // bad/expired token or Apify limit reached
+        return fail(res, 503, "unavailable", "The downloader is temporarily unavailable. Please try again later.");
+      }
       if (r.status === 429 || r.status >= 500) return fail(res, 503, "provider_busy", "The media service is busy right now. Please try again in a minute.");
       return fail(res, 502, "provider_error", "The media service couldn't process this Reel. It may be private or unavailable, or the service may be down. Try again later.");
     }
