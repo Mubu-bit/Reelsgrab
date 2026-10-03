@@ -34,7 +34,8 @@
     const dl = d.downloadUrl || d.videoUrl;
     const card = mk("div", "rcard");
     const video = mk("video", "rvideo");
-    video.controls = true; video.playsInline = true; video.preload = "metadata";
+    video.controls = true; video.playsInline = true; video.preload = "auto";
+    video.addEventListener("loadedmetadata", () => { try { if (!video.currentTime) video.currentTime = 0.1; } catch {} });
     if (d.thumbnail) video.poster = d.thumbnail;
     card.append(video);
 
@@ -69,7 +70,7 @@
       blobUrl = URL.createObjectURL(blob);
       video.src = blobUrl;
       save.disabled = false; save.textContent = "Save to Photos";
-    }).catch(() => { video.src = dl; save.remove(); });
+    }).catch(() => { video.preload = "metadata"; video.src = dl; save.remove(); });
 
     save.addEventListener("click", async () => {
       if (!file) return;

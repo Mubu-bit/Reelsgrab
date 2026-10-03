@@ -27,7 +27,7 @@ if (IS_PROD && !EMAIL) {
   process.exit(1);
 }
 const NAME = "ReelGrab";
-const UPDATED = "October 1, 2026";
+const UPDATED = "October 3, 2026";
 
 const HOME_TITLE = "Instagram Reel Downloader — Free, No Login | ReelGrab";
 const HOME_DESC = "Free Instagram Reel downloader. Paste a public Reel link and get a download link. No app, no sign-up. Works on iPhone, Android and desktop.";
