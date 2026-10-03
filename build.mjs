@@ -78,7 +78,7 @@ function render(p) {
     (p.noindex ? `<meta name="robots" content="noindex,follow">` : `<link rel="canonical" href="${url}"><meta name="robots" content="index,follow,max-image-preview:large">`) +
     `<meta name="theme-color" content="#080b12"><link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png">` +
     (p.noindex ? "" : `<meta property="og:type" content="website"><meta property="og:site_name" content="${NAME}"><meta property="og:title" content="${e(p.title)}"><meta property="og:description" content="${e(p.desc)}"><meta property="og:url" content="${url}"><meta property="og:image" content="${img}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="ReelGrab — Instagram Reel downloader"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${e(p.title)}"><meta name="twitter:description" content="${e(p.desc)}"><meta name="twitter:image" content="${img}">`) +
-    `<link rel="stylesheet" href="/style.css">${jsonld(p, url)}</head><body>${header}<main id="main">${crumb ? `<div class="wrap">${crumb}</div>` : ""}${body}</main>${footer}${p.script ? `<script src="/app.js" defer></script>` : ""}</body></html>`;
+    `<link rel="stylesheet" href="/style.css">${jsonld(p, url)}</head><body>${header}<main id="main">${crumb ? `<div class="wrap">${crumb}</div>` : ""}${body}</main>${footer}${p.script ? `<script src="/app.js" defer></script>` : ""}<script defer src="/_vercel/insights/script.js"></script></body></html>`;
 }
 
 rmSync("dist", { recursive: true, force: true });
