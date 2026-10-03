@@ -24,6 +24,60 @@
     return null;
   }
 
+
+  let blobUrl = null;
+  const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; return e; };
+
+  function showResult(d) {
+    if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl = null; }
+    result.replaceChildren();
+    const dl = d.downloadUrl || d.videoUrl;
+    const card = mk("div", "rcard");
+    const video = mk("video", "rvideo");
+    video.controls = true; video.playsInline = true; video.preload = "metadata";
+    if (d.thumbnail) video.poster = d.thumbnail;
+    card.append(video);
+
+    const save = mk("button", "rbtn", "Preparing…");
+    save.type = "button"; save.disabled = true;
+    const canShare = typeof navigator.canShare === "function" && typeof navigator.share === "function" &&
+      navigator.canShare({ files: [new File([""], "a.mp4", { type: "video/mp4" })] });
+
+    const a = mk("a", "rbtn main", "Download video");
+    a.href = dl; a.download = "reelgrab-video.mp4";
+    card.append(a);
+    if (canShare) card.append(save);
+
+    const again = mk("button", "rbtn", "Download another");
+    again.type = "button";
+    again.addEventListener("click", () => {
+      if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl = null; }
+      result.replaceChildren(); input.value = ""; say(""); input.focus();
+    });
+    card.append(again);
+    result.append(card);
+
+    // Fetch the file once: used for the preview and for the "Save to Photos" share sheet.
+    let file = null;
+    fetch(dl).then(r => {
+      if (!r.ok) throw new Error("fetch");
+      if (Number(r.headers.get("content-length")) > 80e6) throw new Error("big");
+      return r.blob();
+    }).then(b => {
+      const blob = b.type ? b : new Blob([b], { type: "video/mp4" });
+      file = new File([blob], "reelgrab-video.mp4", { type: blob.type });
+      blobUrl = URL.createObjectURL(blob);
+      video.src = blobUrl;
+      save.disabled = false; save.textContent = "Save to Photos";
+    }).catch(() => { video.src = dl; save.remove(); });
+
+    save.addEventListener("click", async () => {
+      if (!file) return;
+      try { await navigator.share({ files: [file] }); }
+      catch (e) { if (e && e.name !== "AbortError") say("Couldn't open the share sheet. Use “Download video” instead.", "err"); }
+    });
+  }
+
   paste.addEventListener("click", async () => {
     try { input.value = (await navigator.clipboard.readText()).trim(); say("Link pasted. Now tap “" + LABEL + "”."); input.focus(); }
     catch { say("Your browser blocked clipboard access. Long-press the box and paste the link manually.", "err"); }
@@ -59,16 +113,7 @@
         return;
       }
       say("Ready. The link is temporary, so save the video soon.", "ok");
-      if (d.thumbnail) {
-        const img = new Image();
-        img.className = "preview"; img.alt = "Preview of the Reel"; img.referrerPolicy = "no-referrer"; img.loading = "lazy"; img.decoding = "async";
-        img.addEventListener("error", () => img.remove());
-        img.src = d.thumbnail;
-        result.append(img);
-      }
-      const a = document.createElement("a");
-      a.href = d.downloadUrl || d.videoUrl; a.download = "reelgrab-video.mp4"; a.textContent = "Download video";
-      result.append(a);
+      showResult(d);
     } catch (e) {
       say(e && e.name === "AbortError"
         ? "This took too long and was stopped. Try again, or try a different Reel."
