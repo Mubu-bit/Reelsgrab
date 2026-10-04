@@ -1,0 +1,71 @@
+{
+  "lang": "en",
+  "dir": "ltr",
+  "ogLocale": "en_US",
+  "switchLabel": "English",
+  "skip": "Skip to content",
+  "navAria": "Main",
+  "footerAria": "Footer",
+  "crumbAria": "Breadcrumb",
+  "crumbSep": "›",
+  "nav": { "how": "How it works", "guides": "Guides", "faq": "FAQ", "about": "About" },
+  "footer": {
+    "about": "About",
+    "contact": "Contact",
+    "privacy": "Privacy",
+    "terms": "Terms",
+    "iphone": "iPhone guide",
+    "android": "Android guide",
+    "troubleshooting": "Troubleshooting"
+  },
+  "copyright": "© 2026 ReelGrab. An independent tool, not affiliated with, endorsed by, or sponsored by Instagram or Meta.",
+  "ogImageAlt": "ReelGrab — Instagram Reel downloader",
+  "appName": "ReelGrab Instagram Reel Downloader",
+  "appDesc": "Free web tool that turns a public Instagram Reel link into a downloadable video link. No sign-up required.",
+  "pages": {
+    "index": {
+      "title": "Instagram Reel Downloader — Free, No Login | ReelGrab",
+      "desc": "Free Instagram Reel downloader. Paste a public Reel link and get a download link. No app, no sign-up. Works on iPhone, Android and desktop."
+    },
+    "iphone": {
+      "crumb": "iPhone guide",
+      "title": "How to Download Instagram Reels on iPhone (Safari) | ReelGrab",
+      "desc": "Step-by-step: save a public Instagram Reel on iPhone with Safari. No app or login. Where the file goes, how to get it into Photos, and fixes for common problems."
+    },
+    "android": {
+      "crumb": "Android guide",
+      "title": "How to Download Instagram Reels on Android (Chrome) | ReelGrab",
+      "desc": "Save a public Instagram Reel on Android with Chrome. No extra app or login. Where downloads are stored, permissions, and fixes for common problems."
+    },
+    "troubleshooting": {
+      "crumb": "Troubleshooting",
+      "title": "Instagram Reel Won't Download? Causes and Fixes | ReelGrab",
+      "desc": "Why an Instagram Reel can't be downloaded: invalid links, private or deleted Reels, rate limits, provider errors and network problems — with what to try next."
+    },
+    "about": {
+      "crumb": "About",
+      "title": "About ReelGrab | Simple Instagram Reel Downloader",
+      "desc": "What ReelGrab is, how it works at a high level, and how to use it responsibly. An independent tool, not affiliated with Instagram or Meta."
+    },
+    "contact": {
+      "crumb": "Contact",
+      "title": "Contact ReelGrab",
+      "desc": "How to contact ReelGrab about problems, privacy questions, or copyright concerns."
+    },
+    "privacy": {
+      "crumb": "Privacy",
+      "title": "Privacy Policy | ReelGrab",
+      "desc": "Exactly what happens to the Instagram Reel link you submit to ReelGrab, who processes it, and what is and isn't recorded."
+    },
+    "terms": {
+      "crumb": "Terms",
+      "title": "Terms of Use | ReelGrab",
+      "desc": "Terms for using ReelGrab: lawful use, copyright, availability, third-party services and limits."
+    },
+    "404": {
+      "title": "Page not found | ReelGrab",
+      "desc": "This page doesn't exist."
+    }
+  },
+  "ui": {}
+}
