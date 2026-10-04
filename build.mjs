@@ -1,6 +1,8 @@
-// Static build: src/pages/*.html + layout -> dist/. Run by Vercel via `npm run build`.
+// Static build: English bodies (root *.html) + other languages (locales/<code>.json + locales/<code>/*.html) -> dist/.
+// Run by Vercel via `npm run build`.
 // Env: SITE_URL (final domain), CONTACT_EMAIL (shown on /contact and /privacy; REQUIRED for production builds).
-import { readFileSync, writeFileSync, mkdirSync, rmSync, cpSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, rmSync, cpSync, existsSync, readdirSync } from "node:fs";
+import { dirname } from "node:path";
 
 const IS_PROD = process.env.VERCEL_ENV === "production";
 const fromEnv = (process.env.SITE_URL || "").trim() ||
@@ -26,67 +28,148 @@ if (IS_PROD && !EMAIL) {
   console.error("\nBUILD ERROR: CONTACT_EMAIL is not set. Add CONTACT_EMAIL=your real email in Vercel > Settings > Environment Variables (Production), then redeploy.\nThe production build is stopped so that no placeholder is ever published.\n");
   process.exit(1);
 }
+
 const NAME = "ReelGrab";
-const UPDATED = "October 3, 2026";
+const UPDATED_ISO = "2026-10-03"; // "Last updated" date shown on Privacy/Terms, formatted per language
+const LASTMOD = "2026-10-04";     // sitemap <lastmod>; change it when page content changes
 
-const HOME_TITLE = "Instagram Reel Downloader — Free, No Login | ReelGrab";
-const HOME_DESC = "Free Instagram Reel downloader. Paste a public Reel link and get a download link. No app, no sign-up. Works on iPhone, Android and desktop.";
-
-const pages = [
-  { file: "index", path: "/", title: HOME_TITLE, desc: HOME_DESC, script: true },
-  { file: "iphone", path: "/download-instagram-reels-on-iphone", crumb: "iPhone guide", title: "How to Download Instagram Reels on iPhone (Safari) | ReelGrab", desc: "Step-by-step: save a public Instagram Reel on iPhone with Safari. No app or login. Where the file goes, how to get it into Photos, and fixes for common problems." },
-  { file: "android", path: "/download-instagram-reels-on-android", crumb: "Android guide", title: "How to Download Instagram Reels on Android (Chrome) | ReelGrab", desc: "Save a public Instagram Reel on Android with Chrome. No extra app or login. Where downloads are stored, permissions, and fixes for common problems." },
-  { file: "troubleshooting", path: "/instagram-reel-not-downloading", crumb: "Troubleshooting", title: "Instagram Reel Won't Download? Causes and Fixes | ReelGrab", desc: "Why an Instagram Reel can't be downloaded: invalid links, private or deleted Reels, rate limits, provider errors and network problems — with what to try next." },
-  { file: "about", path: "/about", crumb: "About", title: "About ReelGrab | Simple Instagram Reel Downloader", desc: "What ReelGrab is, how it works at a high level, and how to use it responsibly. An independent tool, not affiliated with Instagram or Meta." },
-  { file: "contact", path: "/contact", crumb: "Contact", title: "Contact ReelGrab", desc: "How to contact ReelGrab about problems, privacy questions, or copyright concerns." },
-  { file: "privacy", path: "/privacy", crumb: "Privacy", title: "Privacy Policy | ReelGrab", desc: "Exactly what happens to the Instagram Reel link you submit to ReelGrab, who processes it, and what is and isn't recorded." },
-  { file: "terms", path: "/terms", crumb: "Terms", title: "Terms of Use | ReelGrab", desc: "Terms for using ReelGrab: lawful use, copyright, availability, third-party services and limits." },
-  { file: "404", path: "/404", title: "Page not found | ReelGrab", desc: "This page doesn't exist.", noindex: true },
+// Every page. `id` keys the translations in locales/<code>.json; `slug` is the URL path and the body file name.
+const PAGES = [
+  { id: "index", slug: "", script: true },
+  { id: "iphone", slug: "download-instagram-reels-on-iphone" },
+  { id: "android", slug: "download-instagram-reels-on-android" },
+  { id: "troubleshooting", slug: "instagram-reel-not-downloading" },
+  { id: "about", slug: "about" },
+  { id: "contact", slug: "contact" },
+  { id: "privacy", slug: "privacy" },
+  { id: "terms", slug: "terms" },
+  { id: "404", slug: "404", noindex: true },
 ];
+const byId = Object.fromEntries(PAGES.map(p => [p.id, p]));
 
-const e = s => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+// ---- Languages: English is built from the repo root; every other locales/<code>.json adds a language under /<code>/.
+const readJson = f => JSON.parse(readFileSync(f, "utf8"));
+const codes = ["en", ...readdirSync("locales").filter(f => f.endsWith(".json") && f !== "en.json").map(f => f.slice(0, -5)).sort()];
+const LOC = Object.fromEntries(codes.map(c => [c, readJson(`locales/${c}.json`)]));
+
+const bodyFile = (c, p) => {
+  const name = p.id === "index" ? "index" : p.slug;
+  return c === "en" ? `${name}.html` : `locales/${c}/${name}.html`;
+};
+// A page exists in a language only if it has a translated body AND translated title/description.
+// (The 404 page is English-only: Vercel serves one global 404.)
+const has = (c, p) => existsSync(bodyFile(c, p)) && !!LOC[c].pages?.[p.id] && (c === "en" || !p.noindex);
+const pathOf = (c, p) => {
+  const prefix = c === "en" ? "" : "/" + c;
+  return p.slug === "" ? (prefix || "/") : `${prefix}/${p.slug}`;
+};
+const urlOf = (c, p) => SITE + pathOf(c, p);
+const linkTo = (c, id) => pathOf(has(c, byId[id]) ? c : "en", byId[id]); // link to the same-language page, else English
+const distFile = (c, p) => {
+  const name = p.id === "index" ? "index" : p.slug;
+  return c === "en" ? `dist/${name}.html` : `dist/${c}/${name}.html`;
+};
+
+for (const c of codes) {
+  if (!has(c, byId.index)) {
+    console.error(`\nBUILD ERROR: language "${c}" needs locales/${c}/index.html and pages.index in locales/${c}.json.\n`);
+    process.exit(1);
+  }
+  const d = LOC[c];
+  for (const k of ["lang", "dir", "ogLocale", "switchLabel", "skip", "navAria", "footerAria", "crumbAria", "crumbSep", "nav", "footer", "copyright", "ogImageAlt", "appName", "appDesc"]) {
+    if (d[k] === undefined) { console.error(`\nBUILD ERROR: locales/${c}.json is missing "${k}".\n`); process.exit(1); }
+  }
+}
+
+const e = s => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 const contactHtml = EMAIL
   ? `<a href="mailto:${e(EMAIL)}">${e(EMAIL)}</a>`
   : `<strong>[Contact email not configured yet — set CONTACT_EMAIL in Vercel]</strong>`;
+const fmtDate = c => {
+  // Latin digits in every language so numbers match the rest of the page.
+  const tag = c === "en" ? "en-US" : `${c}-u-nu-latn`;
+  try { return new Intl.DateTimeFormat(tag, { dateStyle: "long", timeZone: "UTC" }).format(new Date(UPDATED_ISO)); }
+  catch { return UPDATED_ISO; }
+};
 
-const header = `<a class="skip" href="#main">Skip to content</a><header><a class="brand" href="/">Reel<span>Grab</span></a><nav aria-label="Main"><a href="/#how">How it works</a><a href="/#guides">Guides</a><a href="/#faq">FAQ</a><a href="/about">About</a></nav></header>`;
-const footer = `<footer><nav aria-label="Footer"><a href="/about">About</a><a href="/contact">Contact</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/download-instagram-reels-on-iphone">iPhone guide</a><a href="/download-instagram-reels-on-android">Android guide</a><a href="/instagram-reel-not-downloading">Troubleshooting</a></nav><small>© 2026 ReelGrab. An independent tool, not affiliated with, endorsed by, or sponsored by Instagram or Meta.</small></footer>`;
+function header(c) {
+  const L = LOC[c], home = linkTo(c, "index");
+  return `<a class="skip" href="#main">${e(L.skip)}</a><header><a class="brand" href="${home}">Reel<span>Grab</span></a><nav aria-label="${e(L.navAria)}"><a href="${home}#how">${e(L.nav.how)}</a><a href="${home}#guides">${e(L.nav.guides)}</a><a href="${home}#faq">${e(L.nav.faq)}</a><a href="${linkTo(c, "about")}">${e(L.nav.about)}</a></nav></header>`;
+}
 
-function jsonld(p, url) {
+function footer(c, p) {
+  const L = LOC[c];
+  const order = ["about", "contact", "privacy", "terms", "iphone", "android", "troubleshooting"];
+  const links = order.map(id => `<a href="${linkTo(c, id)}">${e(L.footer[id])}</a>`).join("");
+  // Language switcher: link to this same page in every other language that has it.
+  const switcher = codes.filter(o => o !== c && !p.noindex && has(o, p))
+    .map(o => `<a href="${pathOf(o, p)}" hreflang="${o}" lang="${o}">${e(LOC[o].switchLabel)}</a>`).join("");
+  return `<footer><nav aria-label="${e(L.footerAria)}">${links}${switcher}</nav><small>${e(L.copyright)}</small></footer>`;
+}
+
+function jsonld(c, p, url) {
   if (p.noindex) return "";
+  const L = LOC[c];
   let g;
-  if (p.file === "index") {
+  if (p.id === "index") {
     g = { "@context": "https://schema.org", "@graph": [
-      { "@type": "WebSite", "@id": SITE + "/#website", name: NAME, url: SITE + "/" },
-      { "@type": "WebApplication", "@id": SITE + "/#app", name: "ReelGrab Instagram Reel Downloader", url: SITE + "/", applicationCategory: "MultimediaApplication", operatingSystem: "Any (web browser)",
-        description: "Free web tool that turns a public Instagram Reel link into a downloadable video link. No sign-up required.", offers: { "@type": "Offer", price: "0", priceCurrency: "USD" }, isPartOf: { "@id": SITE + "/#website" } } ] };
+      { "@type": "WebSite", "@id": `${urlOf(c, p)}#website`, name: NAME, url: url, inLanguage: L.lang },
+      { "@type": "WebApplication", "@id": `${urlOf(c, p)}#app`, name: L.appName, url: url, inLanguage: L.lang, applicationCategory: "MultimediaApplication", operatingSystem: "Any (web browser)",
+        description: L.appDesc, offers: { "@type": "Offer", price: "0", priceCurrency: "USD" }, isPartOf: { "@id": `${urlOf(c, p)}#website` } } ] };
   } else {
     g = { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
-      { "@type": "ListItem", position: 1, name: NAME, item: SITE + "/" },
-      { "@type": "ListItem", position: 2, name: p.crumb, item: url } ] };
+      { "@type": "ListItem", position: 1, name: NAME, item: urlOf(c, byId.index) },
+      { "@type": "ListItem", position: 2, name: L.pages[p.id].crumb, item: url } ] };
   }
   return `<script type="application/ld+json">${JSON.stringify(g)}</script>`;
 }
 
-function render(p) {
-  const url = SITE + (p.path === "/" ? "/" : p.path);
-  const body = readFileSync(p.file === "index" ? "index.html" : p.file === "404" ? "404.html" : p.path.slice(1) + ".html", "utf8")
-    .replaceAll("{{CONTACT}}", contactHtml).replaceAll("{{UPDATED}}", UPDATED).replaceAll("{{SITE_URL}}", SITE);
-  const crumb = p.crumb && p.file !== "404" ? `<nav class="crumb" aria-label="Breadcrumb"><a href="/">ReelGrab</a> › ${e(p.crumb)}</nav>` : "";
+function render(c, p) {
+  const L = LOC[c], meta = L.pages[p.id];
+  const url = urlOf(c, p);
+  const body = readFileSync(bodyFile(c, p), "utf8")
+    .replaceAll("{{CONTACT}}", contactHtml).replaceAll("{{UPDATED}}", fmtDate(c)).replaceAll("{{SITE_URL}}", SITE);
+  const crumb = meta.crumb && p.id !== "404"
+    ? `<nav class="crumb" aria-label="${e(L.crumbAria)}"><a href="${linkTo(c, "index")}">${NAME}</a> ${L.crumbSep} ${e(meta.crumb)}</nav>` : "";
   const img = SITE + "/og-image.png";
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${e(p.title)}</title><meta name="description" content="${e(p.desc)}">` +
-    (p.noindex ? `<meta name="robots" content="noindex,follow">` : `<link rel="canonical" href="${url}"><meta name="robots" content="index,follow,max-image-preview:large">`) +
+
+  const alts = codes.filter(o => has(o, p));
+  const hreflang = (!p.noindex && alts.length > 1)
+    ? alts.map(o => `<link rel="alternate" hreflang="${o}" href="${urlOf(o, p)}">`).join("") + `<link rel="alternate" hreflang="x-default" href="${urlOf("en", p)}">`
+    : "";
+  const ogAlt = (!p.noindex) ? alts.filter(o => o !== c).map(o => `<meta property="og:locale:alternate" content="${LOC[o].ogLocale}">`).join("") : "";
+  const ui = p.script && L.ui && Object.keys(L.ui).length
+    ? `<script type="application/json" id="i18n">${JSON.stringify(L.ui).replace(/</g, "\\u003c")}</script>` : "";
+
+  return `<!doctype html><html lang="${L.lang}" dir="${L.dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${e(meta.title)}</title><meta name="description" content="${e(meta.desc)}">` +
+    (p.noindex ? `<meta name="robots" content="noindex,follow">` : `<link rel="canonical" href="${url}"><meta name="robots" content="index,follow,max-image-preview:large">${hreflang}`) +
     `<meta name="theme-color" content="#080b12"><link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png">` +
-    (p.noindex ? "" : `<meta property="og:type" content="website"><meta property="og:site_name" content="${NAME}"><meta property="og:title" content="${e(p.title)}"><meta property="og:description" content="${e(p.desc)}"><meta property="og:url" content="${url}"><meta property="og:image" content="${img}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="ReelGrab — Instagram Reel downloader"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${e(p.title)}"><meta name="twitter:description" content="${e(p.desc)}"><meta name="twitter:image" content="${img}">`) +
-    `<link rel="stylesheet" href="/style.css">${jsonld(p, url)}</head><body>${header}<main id="main">${crumb ? `<div class="wrap">${crumb}</div>` : ""}${body}</main>${footer}${p.script ? `<script src="/app.js" defer></script>` : ""}<script defer src="/_vercel/insights/script.js"></script></body></html>`;
+    (p.noindex ? "" : `<meta property="og:type" content="website"><meta property="og:site_name" content="${NAME}"><meta property="og:locale" content="${L.ogLocale}">${ogAlt}<meta property="og:title" content="${e(meta.title)}"><meta property="og:description" content="${e(meta.desc)}"><meta property="og:url" content="${url}"><meta property="og:image" content="${img}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="${e(L.ogImageAlt)}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${e(meta.title)}"><meta name="twitter:description" content="${e(meta.desc)}"><meta name="twitter:image" content="${img}">`) +
+    `<link rel="stylesheet" href="/style.css">${jsonld(c, p, url)}</head><body>${header(c)}<main id="main">${crumb ? `<div class="wrap">${crumb}</div>` : ""}${body}</main>${footer(c, p)}${ui}${p.script ? `<script src="/app.js" defer></script>` : ""}<script defer src="/_vercel/insights/script.js"></script></body></html>`;
 }
 
 rmSync("dist", { recursive: true, force: true });
 mkdirSync("dist", { recursive: true });
-for (const p of pages) writeFileSync(`dist/${p.file === "index" ? "index" : p.file === "404" ? "404" : p.path.slice(1)}.html`, render(p));
+let built = 0;
+for (const c of codes) for (const p of PAGES) {
+  if (!has(c, p)) continue;
+  const out = distFile(c, p);
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, render(c, p));
+  built++;
+}
 for (const f of ["app.js", "style.css", "favicon.svg", "favicon.ico", "apple-touch-icon.png", "og-image.png", "ads.txt"]) cpSync(f, `dist/${f}`);
 
-const indexable = pages.filter(p => !p.noindex);
-writeFileSync("dist/sitemap.xml", `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${indexable.map(p => `<url><loc>${SITE}${p.path === "/" ? "/" : p.path}</loc></url>`).join("\n")}\n</urlset>\n`);
+// Sitemap: one <url> per language version, each listing all its alternates (hreflang) so Google links them.
+const entries = [];
+for (const c of codes) for (const p of PAGES) {
+  if (p.noindex || !has(c, p)) continue;
+  const alts = codes.filter(o => has(o, p));
+  const links = alts.length > 1
+    ? alts.map(o => `<xhtml:link rel="alternate" hreflang="${o}" href="${urlOf(o, p)}"/>`).join("") + `<xhtml:link rel="alternate" hreflang="x-default" href="${urlOf("en", p)}"/>`
+    : "";
+  entries.push(`<url><loc>${urlOf(c, p)}</loc><lastmod>${LASTMOD}</lastmod>${links}</url>`);
+}
+writeFileSync("dist/sitemap.xml", `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${entries.join("\n")}\n</urlset>\n`);
 writeFileSync("dist/robots.txt", `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${SITE}/sitemap.xml\n`);
-console.log(`Built ${pages.length} pages for ${SITE}` + (EMAIL ? "" : "  (preview/dev build: CONTACT_EMAIL not set, placeholder shown)"));
+console.log(`Built ${built} pages (${codes.join(", ")}) for ${SITE}` + (EMAIL ? "" : "  (preview/dev build: CONTACT_EMAIL not set, placeholder shown)"));

@@ -12,9 +12,25 @@ Static pages built by `build.mjs` into `dist/`, plus one serverless function (`a
 Variables are read at build time, so **redeploy after changing any of them**.
 
 ## Files
-- Root `*.html` files are page **bodies**, named after their URL. `build.mjs` wraps each in the shared head/header/footer and writes `dist/` (they are not served directly).
-- `app.js`, `style.css`, icons, `og-image.png`, `ads.txt` live at the root too. `api/download.js` is the only folder.
-- To change a page's title/description, edit the `pages` array in `build.mjs`.
+- Root `*.html` files are the **English** page bodies, named after their URL. `build.mjs` wraps each in the shared head/header/footer and writes `dist/` (they are not served directly).
+- `app.js`, `style.css`, icons, `og-image.png`, `ads.txt` live at the root too. `api/` holds the two serverless functions.
+- Page titles/descriptions and header/footer text live in `locales/<code>.json` (English: `locales/en.json`). The list of pages is the `PAGES` array in `build.mjs`.
+- `robots.txt` and `sitemap.xml` are generated into `dist/` by the build. Don't add copies at the repo root.
+
+## Languages
+English lives at `/`. Every other language lives under `/<code>/` (Arabic: `/ar`).
+
+**Add a language** (example: Spanish, `es`):
+1. Copy `locales/ar.json` to `locales/es.json` and translate every value (keep the keys). Set `lang`, `dir` (`ltr` or `rtl`), `ogLocale` (e.g. `es_ES`), `switchLabel` (e.g. `Español`), `crumbSep`, and translate the `ui` block (the messages shown by the downloader tool).
+2. Create `locales/es/` and put a translated body for each page, using the same file names as `locales/ar/` (`index.html`, `about.html`, …). Keep the element ids on the home page (`url`, `paste`, `download`, `status`, `result`) and the `{{CONTACT}}` / `{{UPDATED}}` placeholders. Link to `/es/...` pages.
+3. Redeploy. The build adds the pages, the language switcher in the footer, `hreflang` tags and the sitemap entries by itself.
+
+A page that has no translated body in a language is simply not built for it (and not listed in `hreflang`); links to it fall back to the English page. The `404` page is English-only. Have a native speaker review every translation before publishing, and research the keywords people really search in that language instead of translating the English ones word for word.
+
+Update the `LASTMOD` constant in `build.mjs` when you change page content, and `UPDATED_ISO` when you change the Privacy or Terms text.
+
+## Hosting plan
+Vercel's **Hobby plan is for non-commercial personal use only** (see Vercel's Fair Use Guidelines). Showing ads or taking payments needs the **Pro** plan (about $20/month). Decide this before turning ads on.
 
 ## Abuse and cost protection (do both)
 `api/download.js` has an in-memory rate limit: 5/min and 30/hour per IP, plus 120 lookups per 10 minutes across all visitors. **It is per serverless instance, so it is best-effort and not a global limiter.** Real protection:
