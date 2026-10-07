@@ -3,6 +3,14 @@
   "trailingSlash": false,
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+    "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "host", "value": "reelsgrab123.vercel.app" }],
+      "destination": "https://www.getreelgrab.com/$1",
+      "permanent": true
+    }
+  ],
   "functions": { "api/download.js": { "maxDuration": 60 } },
   "headers": [
     { "source": "/(.*)", "headers": [
