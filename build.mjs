@@ -4,7 +4,7 @@
 import { readFileSync, writeFileSync, mkdirSync, rmSync, cpSync, existsSync, readdirSync } from "node:fs";
 import { dirname } from "node:path";
 
-const IS_PROD = process.env.VERCEL_ENV === "production";
+const IS_PROD = process.env.VERCEL_ENV === "production" || process.env.CF_PAGES_BRANCH === "main";
 const fromEnv = (process.env.SITE_URL || "").trim() ||
   (process.env.VERCEL_PROJECT_PRODUCTION_URL ? "https://" + process.env.VERCEL_PROJECT_PRODUCTION_URL : "");
 const raw = fromEnv || (IS_PROD ? "" : "http://localhost:3000"); // local/dev preview only; never used in production
@@ -145,7 +145,7 @@ function render(c, p) {
     (p.noindex ? `<meta name="robots" content="noindex,follow">` : `<link rel="canonical" href="${url}"><meta name="robots" content="index,follow,max-image-preview:large">${hreflang}`) +
     `<meta name="theme-color" content="#080b12"><link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png">` +
     (p.noindex ? "" : `<meta property="og:type" content="website"><meta property="og:site_name" content="${NAME}"><meta property="og:locale" content="${L.ogLocale}">${ogAlt}<meta property="og:title" content="${e(meta.title)}"><meta property="og:description" content="${e(meta.desc)}"><meta property="og:url" content="${url}"><meta property="og:image" content="${img}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="${e(L.ogImageAlt)}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${e(meta.title)}"><meta name="twitter:description" content="${e(meta.desc)}"><meta name="twitter:image" content="${img}">`) +
-    `<link rel="stylesheet" href="/style.css">${jsonld(c, p, url)}</head><body>${header(c)}<main id="main">${crumb ? `<div class="wrap">${crumb}</div>` : ""}${body}</main>${footer(c, p)}${ui}${p.script ? `<script src="/app.js" defer></script>` : ""}<script defer src="/_vercel/insights/script.js"></script></body></html>`;
+    `<link rel="stylesheet" href="/style.css">${jsonld(c, p, url)}</head><body>${header(c)}<main id="main">${crumb ? `<div class="wrap">${crumb}</div>` : ""}${body}</main>${footer(c, p)}${ui}${p.script ? `<script src="/app.js" defer></script>` : ""}</body></html>`;
 }
 
 rmSync("dist", { recursive: true, force: true });
@@ -158,7 +158,7 @@ for (const c of codes) for (const p of PAGES) {
   writeFileSync(out, render(c, p));
   built++;
 }
-for (const f of ["app.js", "style.css", "favicon.svg", "favicon.ico", "apple-touch-icon.png", "og-image.png", "ads.txt"]) cpSync(f, `dist/${f}`);
+for (const f of ["app.js", "style.css", "favicon.svg", "favicon.ico", "apple-touch-icon.png", "og-image.png", "ads.txt", "_headers"]) cpSync(f, `dist/${f}`);
 
 // Sitemap: one <url> per language version, each listing all its alternates (hreflang) so Google links them.
 const entries = [];
